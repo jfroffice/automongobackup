@@ -2,7 +2,7 @@
 set -eo pipefail
 #
 # MongoDB Backup Script
-# VER. 0.20
+# VER. 0.21
 # More Info: http://github.com/micahwedemeyer/automongobackup
 
 # Note, this is a lobotomized port of AutoMySQLBackup
@@ -28,6 +28,12 @@ set -eo pipefail
 # Set the following variables to your system needs
 # (Detailed instructions below variables)
 #=====================================================================
+
+# Docker Link to Mongo Container
+DOCKER_LINK="db_1:mongo"
+
+# Docker Mongo Container
+DOCKER_CONTAINER="mongo:3.3"
 
 # Database name to specify a specific database only e.g. myawesomeapp
 # Unnecessary if backup all databases
@@ -119,7 +125,7 @@ LATESTLINK="yes"
 OPLOG="yes"
 
 # Choose other Server if is Replica-Set Master
-REPLICAONSLAVE="yes"
+REPLICAONSLAVE="no"
 
 # Allow DBUSERNAME without DBAUTHDB
 REQUIREDBAUTHDB="yes"
@@ -316,7 +322,7 @@ DNOW=$(date +%u)                                  # Day number of the week 1 to 
 DOM=$(date +%d)                                   # Date of the Month e.g. 27
 M=$(date +%B)                                     # Month e.g January
 W=$(date +%V)                                     # Week Number e.g 37
-VER=0.11                                          # Version Number
+VER=0.21                                          # Version Number
 LOGFILE=$BACKUPDIR/$DBHOST-$(date +%H%M).log       # Logfile Name
 LOGERR=$BACKUPDIR/ERRORS_$DBHOST-$(date +%H%M).log # Logfile Name
 OPT=""                                            # OPT string for use with mongodump
@@ -434,11 +440,11 @@ dbdump () {
     if [ -n "$QUERY" ]; then
         # filter for point-in-time snapshotting and if DOHOURLY=yes
         # shellcheck disable=SC2086
-        mongodump --quiet --host=$DBHOST:$DBPORT --out="$1" $OPT -q "$QUERY"
+        docker run -i --rm --link $DOCKER_LINK -v $1:/tmp $DOCKER_CONTAINER bash -c 'mongodump --host=$MONGO_PORT_27017_TCP_ADDR:$MONGO_PORT_27017_TCP_PORT --out="/tmp" $OPT -q "$QUERY"'
       else
         # all others backups type
         # shellcheck disable=SC2086
-        mongodump --quiet --host=$DBHOST:$DBPORT --out="$1" $OPT
+        docker run -i --rm --link $DOCKER_LINK -v $1:/tmp $DOCKER_CONTAINER bash -c 'mongodump --host=$MONGO_PORT_27017_TCP_ADDR:$MONGO_PORT_27017_TCP_PORT --out="/tmp" $OPT'
     fi
     [ -e "$1" ] && return 0
     echo "ERROR: mongodump failed to create dumpfile: $1" >&2
@@ -637,7 +643,7 @@ fi
 # FILE will not be set if no frequency is selected.
 if [[ -z "$FILE" ]] ; then
   echo "ERROR: No backup frequency was chosen."
-  echo "Please set one of DOHOURLY,DODAILY,DOWEEKLY,DOMONTHLY to \"yes\"" 
+  echo "Please set one of DOHOURLY,DODAILY,DOWEEKLY,DOMONTHLY to \"yes\""
   exit 1
 fi
 
